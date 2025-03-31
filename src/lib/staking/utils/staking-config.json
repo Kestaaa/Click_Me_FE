@@ -1,0 +1,9 @@
+{
+  "networkEndpoint": "https://api.mainnet-beta.solana.com",
+  "programId": "7c4L396ULGj3GYJhsutxZ32H2f2WEs6Tni6ztBXn6o42",
+  "tokenMint": "8y1dkq2J7gC82rXvyeFXW3E1j3KcjhQW6mrt2pCaanSV",
+  "configAccount": "iQKsGm5iVsKHL2SM7baM5LnHkEGuazkdjAtuKevQ5Rm",
+  "feeVaultPda": "BYn1qY3L4MnPJ33zJUi1pPzMeV95q7b13LzLR1C9CwBA",
+  "feeVaultTokenAccount": "DNNMEdcKAfEtnVKvr6MRPoZDm1HsmVEEhQ5SXEcJUQtY",
+  "fallbackWallet": "CD3bsuV8SKzqfuAURUobhpaSt4nj3wBjTgwiuXneZV6g"
+}

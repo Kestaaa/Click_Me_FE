@@ -1,0 +1,809 @@
+{
+  "address": "G4TkobrWyDm77GRyGK2niAzoH7MxvfoyhJvtjpe94uZR",
+  "metadata": {
+    "name": "button_game",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "click",
+      "docs": [
+        "The click instruction uses a progressive fee structure:",
+        "- First click costs INITIAL_CLICK_AMOUNT",
+        "- Each subsequent click adds CLICK_INCREMENT",
+        "- Click is only allowed during an active game."
+      ],
+      "discriminator": [
+        11,
+        147,
+        179,
+        178,
+        145,
+        118,
+        45,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "game_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  51
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "dev_wallet",
+          "writable": true
+        },
+        {
+          "name": "staking_program",
+          "writable": true
+        },
+        {
+          "name": "staking_fee_vault",
+          "writable": true
+        },
+        {
+          "name": "staking_config"
+        },
+        {
+          "name": "metrics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  109,
+                  101,
+                  116,
+                  114,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "emergency_rewards",
+      "docs": [
+        "Allows the admin to distribute rewards to the last clicker if the game has ended,",
+        "bypassing the fee mechanism and staking contract. The game state is not reset,",
+        "intentionally leaving the game broken."
+      ],
+      "discriminator": [
+        63,
+        22,
+        81,
+        168,
+        65,
+        87,
+        73,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "game_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  51
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "winner",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "docs": [
+            "The admin (emergency withdrawal) account."
+          ],
+          "writable": true,
+          "signer": true,
+          "address": "8eh5V49834Fpx4EgihzX7A8KHTZCG5huicq8MbZaboVG"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "get_all_time_stats",
+      "docs": [
+        "Returns all-time game statistics."
+      ],
+      "discriminator": [
+        230,
+        7,
+        40,
+        71,
+        39,
+        187,
+        190,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "metrics",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  109,
+                  101,
+                  116,
+                  114,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": {
+        "defined": {
+          "name": "GameStats"
+        }
+      }
+    },
+    {
+      "name": "get_current_click_cost",
+      "docs": [
+        "Returns the current click cost (or new game cost if the game is inactive)."
+      ],
+      "discriminator": [
+        36,
+        138,
+        186,
+        216,
+        82,
+        26,
+        197,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "game_state",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  51
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": "u64"
+    },
+    {
+      "name": "get_current_game_stats",
+      "docs": [
+        "Returns current game statistics."
+      ],
+      "discriminator": [
+        213,
+        172,
+        255,
+        103,
+        220,
+        89,
+        239,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "metrics",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  109,
+                  101,
+                  116,
+                  114,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [],
+      "returns": {
+        "defined": {
+          "name": "GameStats"
+        }
+      }
+    },
+    {
+      "name": "get_recent_clickers",
+      "docs": [
+        "Returns the recent clickers as a list of (Pubkey, u64) tuples."
+      ],
+      "discriminator": [
+        155,
+        232,
+        33,
+        194,
+        142,
+        239,
+        172,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "metrics",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  109,
+                  101,
+                  116,
+                  114,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "limit",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize_config",
+      "docs": [
+        "Initializes the configuration account with a fixed developer wallet (fallback wallet)",
+        "and hardcoded staking program."
+      ],
+      "discriminator": [
+        208,
+        127,
+        21,
+        1,
+        194,
+        190,
+        196,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start_new_game",
+      "docs": [
+        "The start_new_game instruction distributes rewards and resets game state."
+      ],
+      "discriminator": [
+        240,
+        115,
+        44,
+        106,
+        216,
+        74,
+        190,
+        168
+      ],
+      "accounts": [
+        {
+          "name": "game_state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101,
+                  95,
+                  118,
+                  51
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game_state"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "previous_winner",
+          "writable": true
+        },
+        {
+          "name": "dev_wallet",
+          "writable": true
+        },
+        {
+          "name": "staking_program",
+          "writable": true
+        },
+        {
+          "name": "staking_fee_vault",
+          "writable": true
+        },
+        {
+          "name": "staking_config"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "metrics",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  109,
+                  101,
+                  116,
+                  114,
+                  105,
+                  99,
+                  115
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "GameMetrics",
+      "discriminator": [
+        121,
+        29,
+        97,
+        74,
+        191,
+        137,
+        79,
+        180
+      ]
+    },
+    {
+      "name": "GameState",
+      "discriminator": [
+        144,
+        94,
+        208,
+        172,
+        248,
+        99,
+        134,
+        120
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "GameEnded",
+      "msg": "The game has already ended."
+    },
+    {
+      "code": 6001,
+      "name": "GameNotEnded",
+      "msg": "The game is not yet over."
+    },
+    {
+      "code": 6002,
+      "name": "NotLastClicker",
+      "msg": "Only the last clicker can claim the vault."
+    },
+    {
+      "code": 6003,
+      "name": "InvalidStakingWallet",
+      "msg": "Invalid staking or developer wallet provided."
+    },
+    {
+      "code": 6004,
+      "name": "MetricsUpdateFailed",
+      "msg": "Failed to update metrics."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidFeeAmount",
+      "msg": "Invalid fee amount. Starting a new game requires exactly 3 SOL."
+    },
+    {
+      "code": 6006,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds. Starting a new game requires 3 SOL."
+    },
+    {
+      "code": 6007,
+      "name": "MustStartNewGame",
+      "msg": "Must use start_new_game to start a game. Costs 3 SOL."
+    },
+    {
+      "code": 6008,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow occurred."
+    },
+    {
+      "code": 6009,
+      "name": "ConfigNotInitialized",
+      "msg": "Configuration has not been initialized."
+    },
+    {
+      "code": 6010,
+      "name": "Unauthorized",
+      "msg": "Only the admin can call this function."
+    },
+    {
+      "code": 6011,
+      "name": "InvalidWinner",
+      "msg": "Invalid winner account."
+    }
+  ],
+  "types": [
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dev_wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "staking_program",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "initialized",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameMetrics",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "total_games",
+            "type": "u64"
+          },
+          {
+            "name": "total_clicks_all_time",
+            "type": "u64"
+          },
+          {
+            "name": "total_sol_spent_all_time",
+            "type": "u64"
+          },
+          {
+            "name": "current_game_id",
+            "type": "u64"
+          },
+          {
+            "name": "current_game_clicks",
+            "type": "u64"
+          },
+          {
+            "name": "recent_clickers",
+            "type": {
+              "vec": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "starting_time",
+            "type": "i64"
+          },
+          {
+            "name": "endgame_time",
+            "type": "i64"
+          },
+          {
+            "name": "last_clicker",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_balance",
+            "type": "u64"
+          },
+          {
+            "name": "current_click_amount",
+            "type": "u64"
+          },
+          {
+            "name": "click_count",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameStats",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "total_clicks",
+            "type": "u64"
+          },
+          {
+            "name": "total_contributors",
+            "type": "u64"
+          },
+          {
+            "name": "total_sol_contributed",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "programId": "G4TkobrWyDm77GRyGK2niAzoH7MxvfoyhJvtjpe94uZR",
+  "configPda": "7K8eKFRuapQ7X6pxS37cPruMXkhLQu45DPpF3n5idqAb",
+  "gameStatePda": "FpvUPLdo3ezudzxqhR19oimjLN19gzJFwzzafecNz4m3",
+  "vaultPda": "Ep58hhmE1ymjtEJqGGHahC2M4CrtqoadNP5tT4CecBUp",
+  "metricsPda": "n3odefk4X7WmKwfnnvcfpS2K6rDMDGRcRKu58ZvUvuQ",
+  "fallbackWallet": "8eh5V49834Fpx4EgihzX7A8KHTZCG5huicq8MbZaboVG",
+  "emergencyWithdrawalAddress": "8eh5V49834Fpx4EgihzX7A8KHTZCG5huicq8MbZaboVG",
+  "stakingProgramId": "7VefU1HfJgWWurUbwAE3sV5rqCTRZcZH9QkPmiLF7Dzr",
+  "stakingFeeVaultPda": "5WMpyNaaKtRDD3EYHKWf2ueey8cfnGUtCGyUegEuRVGJ",
+  "stakingConfigAccount": "2XjcSgAQdazgMRWaQfs5YjKPoWHV4Uj5g1XL5hqpa5FY"
+}

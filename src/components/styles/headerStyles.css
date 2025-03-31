@@ -1,0 +1,173 @@
+/* Header button styles with high specificity to override any conflicts */
+@keyframes rainbow-glow {
+    0% { box-shadow: 0 0 10px 3px rgba(255, 0, 0, 0.7); }
+    14% { box-shadow: 0 0 10px 3px rgba(255, 127, 0, 0.7); }
+    28% { box-shadow: 0 0 10px 3px rgba(255, 255, 0, 0.7); }
+    42% { box-shadow: 0 0 10px 3px rgba(0, 255, 0, 0.7); }
+    57% { box-shadow: 0 0 10px 3px rgba(0, 0, 255, 0.7); }
+    71% { box-shadow: 0 0 10px 3px rgba(75, 0, 130, 0.7); }
+    85% { box-shadow: 0 0 10px 3px rgba(143, 0, 255, 0.7); }
+    100% { box-shadow: 0 0 10px 3px rgba(255, 0, 0, 0.7); }
+}
+  
+@keyframes button-tilt {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    50% { transform: rotate(0deg); }
+    75% { transform: rotate(5deg); }
+    100% { transform: rotate(0deg); }
+}
+
+/* Header container styling - updated z-index to match hierarchy */
+header.header-bg {
+    z-index: var(--z-nav); /* 100 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transform: translateZ(0); /* Creates a new stacking context */
+}
+
+
+
+/* Coin animation container - updated z-index to be between button and nav bar */
+.coin-animation-inside {
+    position: fixed; /* Changed from absolute to fixed */
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 35; /* Between button (30) and nav menu (40) */
+    pointer-events: none !important;
+    overflow: visible;
+}
+
+/* Wrapper for the button to allow glow to be visible */
+.button-wrapper {
+    padding: 8px;
+    margin: -8px;
+    position: relative;
+    z-index: 30; /* Updated to match z-index hierarchy */
+}
+
+.header-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 0.375rem 0.625rem;
+    background: linear-gradient(to right, #4338ca, #7c3aed, #ec4899);
+    background-size: 200% 200%;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer !important;
+    transition: all 0.3s ease;
+    z-index: 30; /* Updated to match z-index hierarchy */
+    user-select: none;
+    animation: rainbow-glow 3s infinite;
+    box-shadow: 0 0 10px 3px rgba(255, 0, 0, 0.7);
+    transform-origin: center;
+    height: 48px;
+    line-height: 48px;
+    padding: 0 24px;
+    font-size: 16px;
+    font-family: 'DM Sans', 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+.header-button.clicked {
+    animation: button-tilt 0.5s ease-in-out;
+}
+
+@media (min-width: 640px) {
+    .header-button {
+        padding: 0.5rem 0.75rem;
+    }
+}
+
+.header-button:hover {
+    background: linear-gradient(to right, #3730a3, #6d28d9, #db2777);
+}
+
+.header-button * {
+    cursor: pointer !important;
+    pointer-events: none !important;
+    user-select: none !important;
+}
+
+.header-button .flame-icon {
+    color: #f97316;
+    margin-right: 0.5rem;
+    animation: none !important;
+}
+
+.header-button .button-text {
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+}
+
+@media (min-width: 640px) {
+    .header-button .button-text {
+        font-size: 1.25rem;
+    }
+}
+
+@keyframes coin-burst {
+    0% { 
+      transform: translate(0, 0) scale(0.1); 
+      opacity: 0;
+    }
+    15% { 
+      opacity: 1; 
+    }
+    40% { 
+      opacity: 0.9; 
+    }
+    100% { 
+      transform: translate(var(--tx), var(--ty)) scale(1); 
+      opacity: 0; 
+    }
+}
+
+/* Coin animation styles - updated z-index */
+.coin {
+    position: absolute;
+    animation: coin-burst var(--duration, 1s) ease-out forwards;
+    color: #FFD700;
+    --tx: 0px;
+    --ty: 0px;
+    will-change: transform, opacity;
+    pointer-events: none;
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+    perspective: 1000px;
+    z-index: 25; /* Updated to match z-index hierarchy */
+}
+
+/* Ensure all containers don't clip their content */
+.container {
+    overflow: visible !important;
+}
+
+/* Fix for wallet adapter button - updated z-index */
+.wallet-button {
+    z-index: 30; /* Updated to match z-index hierarchy */
+}
+
+/* Custom override for Connect Wallet Button */
+.wallet-connect .wallet-adapter-button {
+    background-color: transparent !important;
+    border: 2px solid white !important;
+    color: white !important;
+    border-radius: 0 !important;
+}
+
+header .container {
+    padding-left: 0.5rem !important;
+  }
+  
+  .desktop-hamburger-button {
+    margin-left: -4rem;
+  }
