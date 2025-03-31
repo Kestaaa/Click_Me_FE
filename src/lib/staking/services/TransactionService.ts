@@ -155,12 +155,24 @@ export class TransactionService {
         transaction.recentBlockhash = blockhash.blockhash;
         transaction.feePayer = this.wallet.publicKey;
         
-        // Sign and send
-        const signed = await this.wallet.signTransaction(transaction);
-        const signature = await this.connection.sendRawTransaction(signed.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: COMMITMENT_LEVELS.WRITE,
-        });
+        // Different wallets may implement the send method differently
+        // Check if the wallet has a sendTransaction method (Phantom calls it this)
+        let signature;
+        
+        if (typeof this.wallet.sendTransaction === 'function') {
+          // This is the pattern used by most Solana wallet adapters including Phantom's adapter
+          signature = await this.wallet.sendTransaction(transaction, this.connection, {
+            skipPreflight: false,
+            preflightCommitment: COMMITMENT_LEVELS.WRITE,
+          });
+        } else {
+          // Fallback to the old pattern if needed
+          const signed = await this.wallet.signTransaction(transaction);
+          signature = await this.connection.sendRawTransaction(signed.serialize(), {
+            skipPreflight: false,
+            preflightCommitment: COMMITMENT_LEVELS.WRITE,
+          });
+        }
         
         // Wait for confirmation
         Logger.info(`Confirming transaction ${signature} (attempt ${attempt + 1}/${maxRetries + 1})...`);
@@ -218,12 +230,24 @@ export class TransactionService {
         // Sign with additional signers
         transaction.partialSign(...additionalSigners);
         
-        // Sign with the wallet and send
-        const signedTx = await this.wallet.signTransaction(transaction);
-        const signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: COMMITMENT_LEVELS.WRITE,
-        });
+        // Different wallets may implement the send method differently
+        let signature;
+        
+        if (typeof this.wallet.sendTransaction === 'function') {
+          // This is the pattern used by most Solana wallet adapters including Phantom
+          // The wallet adapter's sendTransaction will handle the signing and sending
+          signature = await this.wallet.sendTransaction(transaction, this.connection, {
+            skipPreflight: false,
+            preflightCommitment: COMMITMENT_LEVELS.WRITE,
+          });
+        } else {
+          // Fallback to the old pattern if needed
+          const signedTx = await this.wallet.signTransaction(transaction);
+          signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
+            skipPreflight: false,
+            preflightCommitment: COMMITMENT_LEVELS.WRITE,
+          });
+        }
         
         // Wait for confirmation
         Logger.info(`Confirming multi-signer transaction ${signature} (attempt ${attempt + 1}/${maxRetries + 1})...`);

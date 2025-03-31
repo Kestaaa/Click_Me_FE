@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, createContext, useContext, ReactNode, useRef } from "react";
 import { AnchorProvider, BN } from "@project-serum/anchor";
-import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import { PublicKey, Transaction } from "@solana/web3.js";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { ButtonGameClient } from "@/lib/ButtonGameClient";
 import {
@@ -66,20 +66,18 @@ export function useButtonGame() {
 
 /**
  * Get polling interval based on remaining time.
- * Implements progressive polling to minimize RPC calls.
  */
 const getPollingInterval = (timeRemaining: number): number => {
-  if (timeRemaining <= 0) return 5000; // After game ends, poll every 5 seconds (only once)
-  if (timeRemaining <= 1) return 1000; // Last second: every 1 second
-  if (timeRemaining <= 5) return 1000; // Last 5 seconds: every 1 second
-  if (timeRemaining <= 10) return 1000; // Last 10 seconds: every 1 second
-  if (timeRemaining <= 30) return 5000; // Last 30 seconds: every 5 seconds
-  if (timeRemaining <= 60) return 10000; // Last minute: every 10 seconds
-  if (timeRemaining <= 120) return 20000; // 1-2 minutes: every 20 seconds
-  return 30000; // Otherwise: every 30 seconds
+  if (timeRemaining <= 0) return 5000;
+  if (timeRemaining <= 1) return 1000;
+  if (timeRemaining <= 5) return 1000;
+  if (timeRemaining <= 10) return 1000;
+  if (timeRemaining <= 30) return 5000;
+  if (timeRemaining <= 60) return 10000;
+  if (timeRemaining <= 120) return 20000;
+  return 30000;
 };
 
-// Main hook with all game state logic and optimized polling
 function useButtonGameState(): ButtonGameContextType {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -94,36 +92,32 @@ function useButtonGameState(): ButtonGameContextType {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [currentClickCost, setCurrentClickCost] = useState<BN | null>(null);
 
-  // Refs for managing intervals, caching, and polling flags
+  // Refs for intervals and state caching
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cachedEndgameTimeRef = useRef<BN | null>(null);
+  const gameDurationRef = useRef<number | null>(null);
+  const timeLeftRef = useRef<number>(0);
   const isPollingRef = useRef<boolean>(false);
   const prevTimeLeftRef = useRef<number>(0);
   const gameJustEndedRef = useRef<boolean>(false);
   const hasPolledEndedGameRef = useRef<boolean>(false);
 
-  // Define a dummy wallet for read-only RPC calls if no wallet is connected.
+  // Dummy wallet for read-only RPC calls if needed
   const dummyWallet = useMemo(() => ({
     publicKey: new PublicKey("11111111111111111111111111111111"),
-    signTransaction: async (tx: Transaction) => {
-      throw new Error("Wallet not connected");
-    },
-    signAllTransactions: async (txs: Transaction[]) => {
-      throw new Error("Wallet not connected");
-    },
+    signTransaction: async (tx: Transaction) => { throw new Error("Wallet not connected"); },
+    signAllTransactions: async (txs: Transaction[]) => { throw new Error("Wallet not connected"); },
   }), []);
 
   const activeWallet = wallet || dummyWallet;
 
-  // Create an AnchorProvider and ButtonGameClient only when connection or activeWallet changes.
   const buttonGameClient = useMemo(() => {
     if (!connection || !activeWallet) return null;
-    const provider = new AnchorProvider(
-      connection,
-      activeWallet,
-      { commitment: "confirmed", preflightCommitment: "confirmed" }
-    );
+    const provider = new AnchorProvider(connection, activeWallet, {
+      commitment: "confirmed",
+      preflightCommitment: "confirmed"
+    });
     try {
       const client = new ButtonGameClient(provider);
       console.log("ButtonGameClient created successfully");
@@ -134,24 +128,32 @@ function useButtonGameState(): ButtonGameContextType {
     }
   }, [connection, activeWallet]);
 
-  // Fetch game state from the client.
   const fetchGameState = async (): Promise<void> => {
     if (!buttonGameClient || isPollingRef.current) return;
     isPollingRef.current = true;
     try {
       const stateResult = await buttonGameClient.getGameState();
       if (stateResult) {
+        const now = Math.floor(Date.now() / 1000);
+        const endTime = stateResult.endgameTime.toNumber();
+        const startTime = stateResult.startingTime.toNumber();
+        const gameDuration = endTime - startTime;
+        if (gameDurationRef.current === null || gameDurationRef.current !== gameDuration) {
+          gameDurationRef.current = gameDuration;
+          console.log(`Cached game duration: ${gameDuration}s`);
+        }
+        // Log only the essential fetched state info.
+        console.log(`Fetched game state - remaining time: ${endTime - now}s`);
+
         setGameState(stateResult);
-        const clickCost = buttonGameClient.getCurrentClickCost(stateResult);
-        setCurrentClickCost(clickCost);
-        const remainingTime = buttonGameClient.getRemainingTime(stateResult);
-        setTimeLeft(remainingTime);
-        // Check if the game state changed by comparing endgameTime.
-        if (
-          !cachedEndgameTimeRef.current || 
-          !stateResult.endgameTime.eq(cachedEndgameTimeRef.current)
-        ) {
-          console.log("Game state changed, fetching metrics");
+        setCurrentClickCost(buttonGameClient.getCurrentClickCost(stateResult));
+        const initialRemaining = endTime - now;
+        setTimeLeft(initialRemaining);
+        timeLeftRef.current = initialRemaining;
+
+        const hasChangedEndgameTime = !cachedEndgameTimeRef.current || 
+                                      !stateResult.endgameTime.eq(cachedEndgameTimeRef.current);
+        if (hasChangedEndgameTime) {
           cachedEndgameTimeRef.current = stateResult.endgameTime;
           await fetchGameMetrics();
         }
@@ -164,7 +166,6 @@ function useButtonGameState(): ButtonGameContextType {
     }
   };
 
-  // Fetch game metrics when the game state changes.
   const fetchGameMetrics = async (): Promise<void> => {
     if (!buttonGameClient) return;
     try {
@@ -173,7 +174,7 @@ function useButtonGameState(): ButtonGameContextType {
         setGameMetrics(metricsResult);
         const entries = metricsResult.recentClickers.slice().reverse().map((pubkey) => ({
           contributor: pubkey,
-          amount: new BN(0) // Dummy value; not used in the UI
+          amount: new BN(0)
         }));
         setLeaderboard({
           gameCycle: metricsResult.currentGameId,
@@ -190,45 +191,30 @@ function useButtonGameState(): ButtonGameContextType {
     }
   };
 
-  // Schedule the next polling call based on the remaining time.
   const scheduleNextPoll = () => {
     if (pollingTimeoutRef.current) {
       clearTimeout(pollingTimeoutRef.current);
     }
-    // Reset the ended game poll flag when the game is active.
-    if (timeLeft > 0) {
-      hasPolledEndedGameRef.current = false;
-    }
-    // If game has ended, poll only once.
-    if (timeLeft <= 0) {
+    const currentTime = Math.floor(Date.now() / 1000);
+    const remaining = timeLeftRef.current;
+    const isGameEnded = gameState && gameState.startingTime && remaining <= 0;
+                        
+    console.log(`Polling: remaining=${remaining}s, isGameEnded=${isGameEnded}`);
+
+    if (isGameEnded) {
       if (!hasPolledEndedGameRef.current) {
-        console.log('Game just ended - polling once in 5 seconds, then stopping automatic polling');
+        console.log("Game ended - scheduling a single poll in 5 seconds");
         hasPolledEndedGameRef.current = true;
-        pollingTimeoutRef.current = setTimeout(() => {
-          fetchGameState();
-        }, 5000);
-      } else {
-        console.log('Game has ended and already polled; automatic polling halted.');
+        pollingTimeoutRef.current = setTimeout(() => fetchGameState(), 5000);
       }
       return;
     }
-    let interval: number;
-    if (!wallet) {
-      interval = 60000; // Poll once per minute if wallet not connected
-    } else if (timeLeft <= 1) interval = 1000;
-    else if (timeLeft <= 5) interval = 1000;
-    else if (timeLeft <= 10) interval = 1000;
-    else if (timeLeft <= 30) interval = 5000;
-    else if (timeLeft <= 60) interval = 10000;
-    else if (timeLeft <= 120) interval = 20000;
-    else interval = 30000;
-    console.log(`Scheduling next poll in ${interval}ms (remaining time: ${timeLeft}s, wallet connected: ${!!wallet})`);
-    pollingTimeoutRef.current = setTimeout(() => {
-      fetchGameState();
-    }, interval);
+    
+    const interval = !wallet ? 60000 : getPollingInterval(remaining);
+    console.log(`Next poll scheduled in ${interval}ms`);
+    pollingTimeoutRef.current = setTimeout(() => fetchGameState(), interval);
   };
 
-  // Full refresh for manual updates or after transactions.
   const refreshGameData = async (): Promise<void> => {
     if (!buttonGameClient) return;
     setLoading(true);
@@ -244,17 +230,19 @@ function useButtonGameState(): ButtonGameContextType {
     }
   };
 
-  // Trigger a manual refresh.
   const triggerRefresh = () => {
+    console.log("Manual refresh triggered");
     gameJustEndedRef.current = false;
+    hasPolledEndedGameRef.current = false;
+    if (pollingTimeoutRef.current) {
+      clearTimeout(pollingTimeoutRef.current);
+      pollingTimeoutRef.current = null;
+    }
     setRefreshTrigger(prev => prev + 1);
   };
 
-  // Click button transaction.
   const clickButton = async (): Promise<string> => {
-    if (!wallet) {
-      throw new Error("Please connect your wallet first");
-    }
+    if (!wallet) throw new Error("Please connect your wallet first");
     const isGameActive = gameState && 
                          !gameState.startingTime.isZero() && 
                          Math.floor(Date.now() / 1000) < gameState.endgameTime.toNumber();
@@ -274,11 +262,8 @@ function useButtonGameState(): ButtonGameContextType {
     }
   };
 
-  // Start new game transaction.
   const startNewGame = async (): Promise<string> => {
-    if (!wallet) {
-      throw new Error("Please connect your wallet first");
-    }
+    if (!wallet) throw new Error("Please connect your wallet first");
     setLoading(true);
     try {
       const tx = await buttonGameClient!.startNewGame();
@@ -292,54 +277,52 @@ function useButtonGameState(): ButtonGameContextType {
     }
   };
 
-  // Get the cost to display in the UI.
   const getDisplayCost = (): string => {
     const isGameActive = gameState && 
                          !gameState.startingTime.isZero() && 
                          Math.floor(Date.now() / 1000) < gameState.endgameTime.toNumber();
-    if (!isGameActive) {
-      return NEW_GAME_COST.toFixed(3);
-    }
-    return currentClickCost ? (currentClickCost.toNumber() / 1_000_000_000).toFixed(3) : INITIAL_CLICK_COST.toFixed(3);
+    if (!isGameActive) return NEW_GAME_COST.toFixed(3);
+    return currentClickCost 
+      ? (currentClickCost.toNumber() / 1_000_000_000).toFixed(3) 
+      : INITIAL_CLICK_COST.toFixed(3);
   };
 
-  // Local countdown timer (avoids extra RPC calls).
   useEffect(() => {
     const updateCountdown = () => {
-      if (gameState && gameState.endgameTime) {
+      if (gameState && gameState.endgameTime && gameState.startingTime && gameDurationRef.current !== null) {
         const now = Math.floor(Date.now() / 1000);
-        const endTime = gameState.endgameTime.toNumber();
-        let diff = endTime - now;
+        const startTime = gameState.startingTime.toNumber();
+        const elapsed = now - startTime;
+        let diff = gameDurationRef.current - elapsed;
         if (diff < 0) diff = 0;
+        
         setTimeLeft(diff);
+        timeLeftRef.current = diff;
+        
+        if (prevTimeLeftRef.current > 0 && diff === 0 && !gameJustEndedRef.current) {
+          console.log("Game just ended");
+          gameJustEndedRef.current = true;
+          triggerRefresh();
+        }
+        prevTimeLeftRef.current = diff;
       }
     };
     updateCountdown();
     countdownIntervalRef.current = setInterval(updateCountdown, 1000);
     return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
   }, [gameState]);
 
-  // Start polling when the client is ready.
   useEffect(() => {
-    if (buttonGameClient) {
-      fetchGameState();
-    }
+    if (buttonGameClient) fetchGameState();
     return () => {
-      if (pollingTimeoutRef.current) {
-        clearTimeout(pollingTimeoutRef.current);
-      }
+      if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
     };
   }, [buttonGameClient]);
 
-  // Handle manual refresh trigger.
   useEffect(() => {
-    if (buttonGameClient && refreshTrigger > 0) {
-      refreshGameData();
-    }
+    if (buttonGameClient && refreshTrigger > 0) refreshGameData();
   }, [buttonGameClient, refreshTrigger]);
 
   return {

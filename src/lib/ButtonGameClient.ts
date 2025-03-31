@@ -372,6 +372,7 @@ export class ButtonGameClient {
 
   /**
    * Helper method to send transactions.
+   * Updated to use wallet.sendTransaction for Phantom compatibility
    */
   private async sendTransaction(transaction: Transaction): Promise<string> {
     try {
@@ -379,9 +380,29 @@ export class ButtonGameClient {
       transaction.recentBlockhash = blockhash.blockhash;
       transaction.feePayer = this.wallet.publicKey;
       
-      const signature = await this.provider.sendAndConfirm(transaction, [], {
-        commitment: this.COMMITMENT_LEVELS.WRITE
-      });
+      // Use wallet.sendTransaction instead of provider.sendAndConfirm
+      // This change helps bypass Phantom's phishing warning
+      let signature;
+      
+      if (typeof this.wallet.sendTransaction === 'function') {
+        // Use the wallet adapter's sendTransaction method which will handle signing and sending
+        signature = await this.wallet.sendTransaction(transaction, this.connection, {
+          skipPreflight: false,
+          preflightCommitment: this.COMMITMENT_LEVELS.WRITE,
+        });
+      } else {
+        // Fallback to provider method as before
+        signature = await this.provider.sendAndConfirm(transaction, [], {
+          commitment: this.COMMITMENT_LEVELS.WRITE
+        });
+      }
+      
+      // Wait for confirmation
+      await this.connection.confirmTransaction({
+        signature,
+        blockhash: blockhash.blockhash,
+        lastValidBlockHeight: blockhash.lastValidBlockHeight
+      }, this.COMMITMENT_LEVELS.WRITE);
       
       return signature;
     } catch (error: unknown) {
