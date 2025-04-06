@@ -370,30 +370,39 @@ export class ButtonGameClient {
     }
   }
 
-  /**
-   * Helper method to send transactions.
-   * Updated to use wallet.sendTransaction for Phantom compatibility
-   */
+ /**
+ * Helper method to send transactions.
+ * Optimized for Phantom wallet compatibility
+ */
   private async sendTransaction(transaction: Transaction): Promise<string> {
     try {
       const blockhash = await this.connection.getLatestBlockhash(this.COMMITMENT_LEVELS.WRITE);
       transaction.recentBlockhash = blockhash.blockhash;
       transaction.feePayer = this.wallet.publicKey;
       
-      // Use wallet.sendTransaction instead of provider.sendAndConfirm
-      // This change helps bypass Phantom's phishing warning
-      let signature;
+      let signature: string;
       
-      if (typeof this.wallet.sendTransaction === 'function') {
-        // Use the wallet adapter's sendTransaction method which will handle signing and sending
+      // Check specifically for Phantom's preferred method first
+      if (this.wallet.isPhantom && typeof this.wallet.signAndSendTransaction === 'function') {
+        console.log("Using Phantom's signAndSendTransaction method");
+        const result = await this.wallet.signAndSendTransaction(transaction);
+        signature = result.signature;
+      } 
+      // Then fall back to the standard wallet adapter method
+      else if (typeof this.wallet.sendTransaction === 'function') {
+        console.log("Using standard wallet adapter sendTransaction method");
         signature = await this.wallet.sendTransaction(transaction, this.connection, {
           skipPreflight: false,
           preflightCommitment: this.COMMITMENT_LEVELS.WRITE,
+          maxRetries: 3
         });
-      } else {
-        // Fallback to provider method as before
+      } 
+      // Last resort fallback
+      else {
+        console.log("Using provider.sendAndConfirm as fallback");
         signature = await this.provider.sendAndConfirm(transaction, [], {
-          commitment: this.COMMITMENT_LEVELS.WRITE
+          commitment: this.COMMITMENT_LEVELS.WRITE,
+          skipPreflight: false
         });
       }
       
