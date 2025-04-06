@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { STAKING_TOKEN_MINT } from '@/config';
 import ContractAddress from './ContractAddress';
+import VersionInfo from './VersionInfo';
 
 const Footer: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
@@ -29,11 +30,12 @@ const Footer: React.FC = () => {
   return (
     <footer className="fixed bottom-0 left-0 right-0 w-full py-2 px-4 sm:px-6 footer-bg z-20">
       <div className="container mx-auto flex flex-col lg:flex-row justify-between items-center">
-        {/* Copyright */}
-        <div className="flex items-center order-2 lg:order-1">
+        {/* Copyright and Version Info */}
+        <div className="flex flex-col items-center lg:items-start order-2 lg:order-1">
           <span className="text-xs text-gray-400">
             Click-Me © 2025 All rights reserved
           </span>
+          <VersionInfo className="text-xs mt-1" />
         </div>
         
         {/* Contract Address - Using the ContractAddress component */}

@@ -30,12 +30,15 @@ import {
 export class TransactionService {
   private connection: Connection;
   private wallet: any;
+  private provider: any;
   
-  constructor(connection: Connection, wallet: any) {
+  constructor(connection: Connection, wallet: any, provider?: any) {
     this.connection = connection;
     this.wallet = wallet;
+    this.provider = provider;
   }
   
+  // [Your existing transaction building methods remain unchanged]
   buildInitializeStakeInfoTransaction(stakeInfoKeypair: Keypair): Transaction {
     const tx = new Transaction();
     tx.add(
@@ -144,6 +147,10 @@ export class TransactionService {
     return tx;
   }
   
+  /**
+   * Send a transaction with optimized methods for different wallet types,
+   * with priority given to Phantom's preferred approaches.
+   */
   async sendTransaction(transaction: Transaction, maxRetries = MAX_TRANSACTION_RETRIES): Promise<string> {
     let lastError: Error | null = null;
     let currentDelay = TRANSACTION_RETRY_DELAY;
@@ -155,23 +162,55 @@ export class TransactionService {
         transaction.recentBlockhash = blockhash.blockhash;
         transaction.feePayer = this.wallet.publicKey;
         
-        // Different wallets may implement the send method differently
-        // Check if the wallet has a sendTransaction method (Phantom calls it this)
-        let signature;
+        let signature: string;
         
-        if (typeof this.wallet.sendTransaction === 'function') {
-          // This is the pattern used by most Solana wallet adapters including Phantom's adapter
+        // Clear prioritization for wallet type detection
+        // 1. First check if it's Phantom and has signAndSendTransaction (their preferred method)
+        if (this.isPhantomWallet() && typeof this.wallet.signAndSendTransaction === 'function') {
+          Logger.info("Using Phantom's signAndSendTransaction method");
+          
+          try {
+            // First try the direct transaction approach (standard)
+            const result = await this.wallet.signAndSendTransaction(transaction);
+            signature = result.signature;
+          } catch (phantomError) {
+            Logger.warn("First Phantom transaction attempt failed, trying alternative format", phantomError);
+            
+            // If that fails, try the wrapped object format as a fallback (older versions)
+            const result = await this.wallet.signAndSendTransaction({
+              transaction: transaction
+            });
+            signature = result.signature;
+          }
+        } 
+        // 2. Then check for standard wallet adapter sendTransaction method
+        else if (typeof this.wallet.sendTransaction === 'function') {
+          Logger.info("Using standard wallet adapter sendTransaction method");
           signature = await this.wallet.sendTransaction(transaction, this.connection, {
             skipPreflight: false,
             preflightCommitment: COMMITMENT_LEVELS.WRITE,
+            maxRetries: 2 // Built-in retry for network issues
           });
-        } else {
-          // Fallback to the old pattern if needed
-          const signed = await this.wallet.signTransaction(transaction);
-          signature = await this.connection.sendRawTransaction(signed.serialize(), {
+        }
+        // 3. Then try wallet's signTransaction + manual send (older wallets)
+        else if (typeof this.wallet.signTransaction === 'function') {
+          Logger.info("Using wallet.signTransaction + manual send");
+          const signedTx = await this.wallet.signTransaction(transaction);
+          signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
             skipPreflight: false,
-            preflightCommitment: COMMITMENT_LEVELS.WRITE,
+            preflightCommitment: COMMITMENT_LEVELS.WRITE
           });
+        }
+        // 4. Last resort - fall back to provider method if available
+        else if (this.provider && typeof this.provider.sendAndConfirm === 'function') {
+          Logger.info("Using provider.sendAndConfirm as fallback");
+          signature = await this.provider.sendAndConfirm(transaction, [], {
+            commitment: COMMITMENT_LEVELS.WRITE,
+            skipPreflight: false
+          });
+        }
+        else {
+          throw new Error("No compatible transaction signing method found in wallet");
         }
         
         // Wait for confirmation
@@ -212,6 +251,23 @@ export class TransactionService {
     throw lastError || new Error(`Transaction failed after ${maxRetries + 1} attempts`);
   }
   
+  /**
+   * Helper method to reliably detect if the connected wallet is Phantom.
+   * Uses multiple detection strategies for reliability.
+   */
+  private isPhantomWallet(): boolean {
+    return Boolean(
+      // Direct property check
+      this.wallet.isPhantom || 
+      // Event emitter pattern check (common in Phantom)
+      (this.wallet._eventEmitter && this.wallet._eventEmitter.listenerCount('disconnect') > 0) ||
+      // Adapter name check
+      (this.wallet.adapter && this.wallet.adapter.name === 'Phantom') ||
+      // Check in the window object if accessible
+      (typeof window !== 'undefined' && (window as any).phantom)
+    );
+  }
+  
   async signTransactionWithMultipleSigners(
     transaction: Transaction, 
     additionalSigners: Keypair[]
@@ -231,17 +287,33 @@ export class TransactionService {
         transaction.partialSign(...additionalSigners);
         
         // Different wallets may implement the send method differently
-        let signature;
+        let signature: string;
         
-        if (typeof this.wallet.sendTransaction === 'function') {
-          // This is the pattern used by most Solana wallet adapters including Phantom
-          // The wallet adapter's sendTransaction will handle the signing and sending
+        // For Phantom, we can still use sendTransaction despite multiple signers
+        if (this.isPhantomWallet() && typeof this.wallet.signAndSendTransaction === 'function') {
+          Logger.info("Using Phantom's signAndSendTransaction for multi-signer transaction");
+          try {
+            const result = await this.wallet.signAndSendTransaction(transaction);
+            signature = result.signature;
+          } catch (phantomError) {
+            Logger.warn("Phantom multi-signer attempt failed, trying alternative format", phantomError);
+            const result = await this.wallet.signAndSendTransaction({
+              transaction: transaction
+            });
+            signature = result.signature;
+          }
+        }
+        // Standard wallet adapter flow
+        else if (typeof this.wallet.sendTransaction === 'function') {
+          Logger.info("Using standard wallet adapter sendTransaction for multi-signer");
           signature = await this.wallet.sendTransaction(transaction, this.connection, {
             skipPreflight: false,
             preflightCommitment: COMMITMENT_LEVELS.WRITE,
           });
-        } else {
-          // Fallback to the old pattern if needed
+        } 
+        // Fallback to manual signing and sending
+        else {
+          Logger.info("Using manual signing for multi-signer transaction");
           const signedTx = await this.wallet.signTransaction(transaction);
           signature = await this.connection.sendRawTransaction(signedTx.serialize(), {
             skipPreflight: false,
