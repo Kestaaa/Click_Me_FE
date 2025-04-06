@@ -158,21 +158,38 @@ export class TransactionService {
         // Different wallets may implement the send method differently
         // Check if the wallet has a sendTransaction method (Phantom calls it this)
         let signature;
-        
-        if (typeof this.wallet.sendTransaction === 'function') {
-          // This is the pattern used by most Solana wallet adapters including Phantom's adapter
+  
+        if (
+          // Check if it's Phantom in multiple ways
+          (this.wallet.isPhantom || 
+           (this.wallet._eventEmitter && this.wallet._eventEmitter.listenerCount('disconnect') > 0)) && 
+          typeof this.wallet.signAndSendTransaction === 'function'
+        ) {
+          Logger.info("Using Phantom's signAndSendTransaction method");
+          
+          // Some versions of Phantom might expect different parameter formats
+          try {
+            // First try the direct transaction approach
+            const result = await this.wallet.signAndSendTransaction(transaction);
+            signature = result.signature;
+          } catch (phantomError) {
+            Logger.warn("First Phantom transaction attempt failed, trying alternative format", phantomError);
+            
+            // If that fails, try the wrapped object format as a fallback
+            const result = await this.wallet.signAndSendTransaction({
+              transaction: transaction
+            });
+            signature = result.signature;
+          }
+        } else if (typeof this.wallet.sendTransaction === 'function') {
+          // This is the pattern used by most Solana wallet adapters including Phantom
+          // The wallet adapter's sendTransaction will handle the signing and sending
           signature = await this.wallet.sendTransaction(transaction, this.connection, {
             skipPreflight: false,
             preflightCommitment: COMMITMENT_LEVELS.WRITE,
           });
-        } else {
-          // Fallback to the old pattern if needed
-          const signed = await this.wallet.signTransaction(transaction);
-          signature = await this.connection.sendRawTransaction(signed.serialize(), {
-            skipPreflight: false,
-            preflightCommitment: COMMITMENT_LEVELS.WRITE,
-          });
         }
+
         
         // Wait for confirmation
         Logger.info(`Confirming transaction ${signature} (attempt ${attempt + 1}/${maxRetries + 1})...`);
