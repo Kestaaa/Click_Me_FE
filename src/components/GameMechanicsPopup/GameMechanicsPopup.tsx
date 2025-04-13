@@ -45,6 +45,9 @@ const GameMechanicsPopup: React.FC = () => {
     }
     
     setIsVisible(false);
+    // Re-enable body scrolling when popup is closing
+    document.body.style.overflow = '';
+    
     // Add a delay before fully removing from DOM for exit animation
     setTimeout(() => setIsOpen(false), 300);
     
@@ -92,6 +95,15 @@ const GameMechanicsPopup: React.FC = () => {
       window.removeEventListener('resize', syncButtonWidth);
     };
   }, [isVisible]);
+
+  // Clean up effect to ensure body scroll is re-enabled if component unmounts while popup is open
+  useEffect(() => {
+    return () => {
+      if (isOpen) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
